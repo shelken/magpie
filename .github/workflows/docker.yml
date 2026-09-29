@@ -94,22 +94,20 @@ jobs:
         id: manifest
         working-directory: ${{ runner.temp }}/digests
         run: |
-          TAGS=""
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             V="${GITHUB_REF_NAME#v}"
-            TAGS="-t $IMAGE:$V -t $IMAGE:${V%.*} -t $IMAGE:${V%%.*} -t $IMAGE:latest"
+            TAGS=(-t "$IMAGE:$V" -t "$IMAGE:${V%.*}" -t "$IMAGE:${V%%.*}" -t "$IMAGE:latest")
+            REF_TAG="$V"
           else
-            TAGS="-t $IMAGE:edge"
+            TAGS=(-t "$IMAGE:edge")
+            REF_TAG=edge
           fi
-          docker buildx imagetools create $TAGS \
-            $(printf "$IMAGE@sha256:%s " *)
-
-          REF_TAG=$( [[ "$GITHUB_REF" == refs/tags/v* ]] && echo "${GITHUB_REF_NAME#v}" || echo edge )
+          DIGEST_ARGS=()
+          for d in *; do DIGEST_ARGS+=("$IMAGE@sha256:$d"); done
+          docker buildx imagetools create "${TAGS[@]}" "${DIGEST_ARGS[@]}"
+          docker buildx imagetools inspect "$IMAGE:$REF_TAG"
           DIGEST=$(docker buildx imagetools inspect "$IMAGE:$REF_TAG" --format '{{json .}}' | jq -r '.manifest.digest')
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
-
-      - name: Inspect
-        run: docker buildx imagetools inspect $IMAGE:$( [[ "$GITHUB_REF" == refs/tags/v* ]] && echo "${GITHUB_REF_NAME#v}" || echo edge )
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
