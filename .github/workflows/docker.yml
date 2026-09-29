@@ -83,12 +83,13 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p ${{ runner.temp }}/digests
-          touch ${{ runner.temp }}/digests/${{ steps.build.outputs.digest }}
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
-          name: digests-${{ matrix.platform }}
+          name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -125,8 +126,11 @@ jobs:
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             V="${GITHUB_REF_NAME#v}"
-            TAGS=(-t "$IMAGE:$V" -t "$IMAGE:${V%.*}" -t "$IMAGE:${V%%.*}" -t "$IMAGE:latest")
+            TAGS=(-t "$IMAGE:$V")
             REF_TAG="$V"
+            if [[ "$V" != *-* ]]; then
+              TAGS+=(-t "$IMAGE:${V%.*}" -t "$IMAGE:${V%%.*}" -t "$IMAGE:latest")
+            fi
           else
             TAGS=(-t "$IMAGE:edge")
             REF_TAG=edge
