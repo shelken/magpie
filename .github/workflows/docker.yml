@@ -35,6 +35,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Smoke test the image
+        run: |
+          docker build --load \
+            --cache-from type=gha,scope=${{ matrix.platform }} \
+            --cache-to type=gha,scope=${{ matrix.platform }},mode=max \
+            -t magpie-smoke .
+
+          docker run -d --name smoke -v smoke-ci:/config -p 13425:3425 magpie-smoke
+
+          READY=0
+          for _ in $(seq 1 30); do
+            if curl -s -o /dev/null http://127.0.0.1:13425/v1/models; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" = 1
+
+          CODE=$(curl -s -o /tmp/body.json -w '%{http_code}' \
+            -H 'Authorization: Bearer magpie' -H 'Content-Type: application/json' \
+            -d '{"model":"ci-unknown-model","messages":[{"role":"user","content":"hi"}]}' \
+            http://127.0.0.1:13425/v1/chat/completions)
+          echo "chat/completions answered HTTP $CODE"
+          cat /tmp/body.json; echo
+          (( CODE >= 400 && CODE < 500 ))
+          jq -e '.error.type' /tmp/body.json > /dev/null
+
+          OUT=$(docker run --rm -v smoke-ci:/config magpie-smoke provider add ci-smoke key=sk-ci url=https://example.com)
+          echo "$OUT"
+          echo "$OUT" | grep -q 'added ci-smoke'
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
