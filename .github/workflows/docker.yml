@@ -86,7 +86,7 @@ jobs:
           digest="${{ steps.build.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         if: github.event_name != 'pull_request'
         with:
           name: digests-${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
@@ -106,7 +106,7 @@ jobs:
     outputs:
       digest: ${{ steps.manifest.outputs.digest }}
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           path: ${{ runner.temp }}/digests
           pattern: digests-*
