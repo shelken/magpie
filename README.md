@@ -340,6 +340,31 @@ Linux needs `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` for the app build
 (the Makefile adds the `gtk3` tag; with plain `go build`, pass `-tags gtk3`);
 Windows uses the WebView2 runtime that ships with the OS.
 
+### Docker
+
+`docker build` makes a server image: the terminal-only binary on
+distroless, run as nonroot, with magpie's files in a volume at `/config`
+(`XDG_CONFIG_HOME` points there, `MAGPIE_ADDR` defaults to 0.0.0.0:3425).
+
+```sh
+docker build -t magpie .
+docker run -d --name magpie -p 3425:3425 -p 3430:3430 -v magpie-config:/config magpie
+```
+
+Port 3425 is the gateway for agents (`Bearer magpie`), port 3430 the
+browser UI, which runs instead with
+`docker run ... magpie web --addr 0.0.0.0:3430 --no-open` (it brings the
+gateway up as well) and is worth opening once, to sign in subscriptions and
+add providers. Sign-ins and keys live in the volume and survive restarts;
+credentials magpie would read from desktop apps or the macOS Keychain are
+not part of the image, so a subscription is signed in by magpie itself.
+The gateway accepts any token, so keep 3425 off the public internet.
+
+The workflow (`.github/workflows/docker.yml`) builds linux/amd64 and
+linux/arm64 on native runners and publishes `ghcr.io/<repository owner>/magpie`:
+semver tags plus `latest` on a `v*` release, `edge` on main; pull requests
+build without pushing.
+
 ### Developing
 
 ```sh
